@@ -8,7 +8,7 @@ from models.vae import Var_Autoencoder
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Load data
-data = load_vae_data_from_disk(shuffle=True).to(device)
+data = load_vae_data_from_disk().to(device)
 
 # Dataloader
 ratio = 0.9

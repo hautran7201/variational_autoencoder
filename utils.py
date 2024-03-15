@@ -1,12 +1,13 @@
 import os
 import torch
 import random
+import numpy as np 
 from tqdm import tqdm
 from PIL import Image
 from torchvision import transforms
 
 
-def load_vae_data_from_disk(data_path='data/vae', shuffle=False):
+def load_vae_data_from_disk(data_path='data/vae'):
     # Load data
     total_data = []
     for name in os.listdir(data_path):
@@ -17,11 +18,9 @@ def load_vae_data_from_disk(data_path='data/vae', shuffle=False):
 
     # Shuffle data
     total_data = torch.cat(total_data, 0)
-    if shuffle:
-        shuffled_tensor = torch.randperm(total_data.size(0))
-        total_data = total_data[shuffled_tensor]
-
-    return total_data
+    numpy_total_data = total_data.numpy()
+    np.random.shuffle(numpy_total_data)
+    return torch.tensor(numpy_total_data)
 
 
 def load_multi_dataset(data_structure, saving_path=None):
