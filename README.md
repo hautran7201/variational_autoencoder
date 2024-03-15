@@ -16,6 +16,12 @@ Training model:
 ```bash
   !python vae_train.py
 ``` 
+
+Inference model:
+```bash
+  !python inference.py
+``` 
+
 ## Dataset link
 
 Synthesis Nerf: [Link](https://drive.google.com/drive/folders/128yBriW1IG_3NJ5Rp7APSTZsJqdJdfc1)
