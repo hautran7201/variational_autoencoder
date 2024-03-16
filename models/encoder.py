@@ -63,7 +63,7 @@ class VAE_Encoder(nn.Sequential):
             nn.Conv2d(512, latent_dim*2, kernel_size=3, padding=1),
 
             # (Batch, 8,  /8, width/8) -> (Batch, 8, height/8, width/8)
-            nn.Conv2d(8, latent_dim*2, kernel_size=1, padding=0)
+            nn.Conv2d(latent_dim*2, latent_dim*2, kernel_size=1, padding=0)
         )
 
         self.seed = seed
