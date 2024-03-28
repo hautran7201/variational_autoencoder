@@ -461,20 +461,23 @@ class AutoEncoderLoss(nn.Module):
 
     def set_discriminator_weight(self, weight):
         self.discriminator_weight = weight
-
+    
     def calc_discriminator_adaptive_weight(self, nll_loss, fake_loss, last_layer):
+        # Need to ensure the grad scale from the discriminator back to 1.0 to get the right norm
         self.scale_gradient.set_scale(1.0)
+        # Get the grad norm from the nll loss
+        nll_grads = torch.autograd.grad(nll_loss, last_layer, retain_graph=True)[0]
+        # Get the grad norm for the discriminator loss
+        disc_grads = torch.autograd.grad(fake_loss, last_layer, retain_graph=True)[0]
 
-        nll_grads = nn.autograd.grad(nll_loss, last_layer)
-        disc_grads = nn.autograd.grad(fake_loss, last_layer)
-
+        # Calculate the updated discriminator weight based on the grad norms
         nll_grads_norm = torch.norm(nll_grads)
         disc_grads_norm = torch.norm(disc_grads)
         disc_weight = nll_grads_norm / (disc_grads_norm + 1e-4)
-        disc_weight = torch.clamp(disc_weight, 0, 1e-4)
-        disc_weight *= self.discriminator_weight 
-        self.scale_gradient.set_scale(-disc_weight.items())
-
+        disc_weight = torch.clamp(disc_weight, 0.0, 1e4).detach()
+        disc_weight *= self.discriminator_weight
+        # Set the discriminator weight. It should be negative to reverse gradients into the autoencoder.
+        self.scale_gradient.set_scale(-disc_weight.item())
         return disc_weight, nll_grads_norm, disc_grads_norm
 
     def forward(self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor], last_layer: torch.Tensor):
@@ -482,7 +485,7 @@ class AutoEncoderLoss(nn.Module):
 
         # l1 loss
         ae_loss = F.l1_loss(outputs['x_recon'], batch[self.input_key], reduction='none')
-        num_output_elements = ae_loss[0].numel
+        num_output_elements = ae_loss[0].numel()
         losses['ae_loss'] = ae_loss 
 
         # Lpips loss
@@ -498,13 +501,13 @@ class AutoEncoderLoss(nn.Module):
         losses['output_variance'] = torch.exp(self.log_var)
 
         # Discriminator loss
-        real = self.discriminator(outputs['x_recon'])
-        fake = self.discriminator(batch[self.input_key])
+        real = self.discriminator(batch[self.input_key])
+        fake = self.discriminator(self.scale_gradient(outputs['x_recon']))
         real_loss = F.binary_cross_entropy_with_logits(real, torch.ones_like(real))
         fake_loss = F.binary_cross_entropy_with_logits(fake, torch.zeros_like(fake))
         losses['disc_real_loss'] = real_loss
         losses['disc_fake_loss'] = fake_loss
-        losses['dics_loss'] = 0.5 * (real_loss + fake_loss)
+        losses['disc_loss'] = 0.5 * (real_loss + fake_loss)
 
         # Update the adaptive discriminator loss
         disc_weight, disc_nll_norm, disc_grads_norm = self.calc_discriminator_adaptive_weight(
@@ -551,7 +554,7 @@ class ComposerAutoEncoder(ComposerModel):
         return self.model.get_last_layer_weight()
 
     def forward(self, batch):
-        return self.model(batch)
+        return self.model(batch[self.input_key])
 
     def loss(self, output, batch):
         last_layer = self.model.get_last_layer_weight()

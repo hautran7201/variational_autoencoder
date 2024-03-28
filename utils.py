@@ -21,18 +21,20 @@ def load_vae_data_from_disk(
             data = torch.load(os.path.join(data_path, name))
 
             for key, value in data.items():
-                image = value['images']
-                if len(image.shape) == 4 and image.shape[0] == 1:
-                    image = image.squeeze(0)
+                images = value['images']
 
-                total_data.append(
-                    {
-                        'image': image.contiguous(),
-                        'path': file_path,
-                        'dataset_name': name,
-                        'object_name': key
-                    }
-                )
+                for image in images:
+                    if len(image.shape) == 4 and image.shape[0] == 1:
+                        image = image.squeeze(0)
+
+                    total_data.append(
+                        {
+                            'image': image.contiguous(),
+                            'path': file_path,
+                            'dataset_name': name,
+                            'object_name': key
+                        }
+                    )
 
     # Shuffle data
     dataloader = DataLoader(
