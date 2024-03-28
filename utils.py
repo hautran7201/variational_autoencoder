@@ -2,25 +2,46 @@ import os
 import torch
 import random
 import numpy as np 
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from PIL import Image
 from torchvision import transforms
 
 
-def load_vae_data_from_disk(data_path='data/vae'):
+def load_vae_data_from_disk(
+        data_path='data/vae',
+        batch_size=1,
+        shuffle=False
+    ):
     # Load data
     total_data = []
     for name in os.listdir(data_path):
-        data = torch.load(os.path.join(data_path, name))
+        file_path = os.path.join(data_path, name)
+        if os.path.isfile(os.path.join(data_path, name)):
+            data = torch.load(os.path.join(data_path, name))
 
-        for key, value in data.items():
-            total_data.append(value['images'])
+            for key, value in data.items():
+                image = value['images']
+                if len(image.shape) == 4 and image.shape[0] == 1:
+                    image = image.squeeze(0)
+
+                total_data.append(
+                    {
+                        'image': image.contiguous(),
+                        'path': file_path,
+                        'dataset_name': name,
+                        'object_name': key
+                    }
+                )
 
     # Shuffle data
-    total_data = torch.cat(total_data, 0)
-    numpy_total_data = total_data.numpy()
-    np.random.shuffle(numpy_total_data)
-    return torch.tensor(numpy_total_data)
+    dataloader = DataLoader(
+        total_data,
+        shuffle=shuffle,
+        batch_size=batch_size
+    )
+
+    return dataloader
 
 
 def load_multi_dataset(data_structure, saving_path=None):
@@ -105,7 +126,7 @@ def load_dataset(
 
     return data
         
-
+ 
 def load_images(
         dir_list: list, 
         reshape_image: list=[512, 512], 

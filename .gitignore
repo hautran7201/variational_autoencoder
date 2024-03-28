@@ -1,6 +1,9 @@
 # data 
-data/vae/nerf_llff_data.pt
-data/vae/nerf_synthetic_data.pt
+dataset/vae_dataset/train
+dataset/vae_dataset/test
+
+# log 
+outputs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

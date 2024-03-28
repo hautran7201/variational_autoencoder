@@ -6,20 +6,17 @@ Decoding the latent space into images in the Nerf dataset.
 ## Running code
 Change directory
 ```bash
-  !cd /Your path/variational_autoencoder
+  cd /Your path/variational_autoencoder
 ```
-Load data:
+Create data:
 ```bash
-  !python load_vae_data.py
+  python dataset/save_vae_data.py
 ```
 Training model:
 ```bash
-  !python vae_train.py
-``` 
-
-Inference model:
-```bash
-  !python inference.py
+  config_path = 'direction path'
+  config_name = 'config name'
+  HYDRA_FULL_ERROR=1 python run.py --config-path {config_path} --config-name {config_name}
 ``` 
 
 ## Dataset link
