@@ -1,10 +1,12 @@
 import operator
 import time
+import os, sys, shutil
+import hydra
+
 from collections.abc import Iterable
 from itertools import chain
 from typing import Any, Dict, List, Optional, Union
 
-import hydra
 from composer import Algorithm, Callback, ComposerModel, DataSpec, Evaluator, Trainer
 from composer.algorithms.low_precision_groupnorm import apply_low_precision_groupnorm
 from composer.algorithms.low_precision_layernorm import apply_low_precision_layernorm
@@ -14,8 +16,7 @@ from composer.utils import dist, reproducibility
 from omegaconf import DictConfig, OmegaConf
 from torch.optim import Optimizer
 
-from utils import load_vae_data_from_disk
-
+from utils import load_vae_data_from_disk, day_time
 from model.autoencoder import ComposerAutoEncoder, ComposerDiffusersAutoEncoder
 
 def make_autoencoder_optimizer(config: DictConfig, model: ComposerModel) -> Optimizer:
@@ -117,6 +118,7 @@ def train(config):
     callbacks: List[Callback] = []
     algorithms: List[Algorithm] = []
 
+    # Logger
     if 'logger' in config:
         for log, lg_conf in config.logger.items():
             if '_target_' in lg_conf:
@@ -129,6 +131,7 @@ def train(config):
                 else:
                     logger.append(hydra.utils.instantiate(lg_conf))
 
+    # Algorithms
     if 'algorithms' in config:
         for ag_name, ag_conf in config.algorithms.items():
             if '_target_' in ag_conf:
@@ -153,14 +156,17 @@ def train(config):
                     optimizers=optimizer,
                 )
 
+    # Callbacks
     if 'callbacks' in config:
         for call_conf in config.callbacks.values():
             if '_target_' in call_conf:
                 print(f'Instantiating callbacks <{call_conf._target_}>')
                 callbacks.append(hydra.utils.instantiate(call_conf))
 
+    # Training
+    today, current_time = day_time()
+    save_folder = os.path.join(config.save_outputs, today, current_time)
     scheduler = hydra.utils.instantiate(config.scheduler)
-
     trainer: Trainer = hydra.utils.instantiate(
         config.trainer,
         train_dataloader=train_dataloader,
@@ -171,7 +177,18 @@ def train(config):
         algorithms=algorithms,
         schedulers=scheduler,
         callbacks=callbacks,
+        save_folder=save_folder
     )
+
+    # Save config
+    args = sys.argv
+    config_dir = args[args.index("--config-path") + 1]
+    config_name = args[args.index("--config-name") + 1]
+    config_path = os.path.join(config_dir, config_name)
+    
+    # Copy config file
+    shutil.copy(config_path, os.path.join(save_folder, 'config.yaml'))
+
 
     def eval_and_then_train():
         if config.get('eval_first', True):

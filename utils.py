@@ -2,16 +2,24 @@ import os
 import torch
 import random
 import numpy as np 
+import matplotlib.pyplot as plt
+
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-from PIL import Image
 from torchvision import transforms
+from PIL import Image
+from tqdm import tqdm
+
+import pytz
+from datetime import datetime
 
 
 def load_vae_data_from_disk(
         data_path='data/vae',
         batch_size=1,
-        shuffle=False
+        shuffle=False,
+        image_key='image',
+        drop_last=True,
+        pin_memory=False
     ):
     # Load data
     total_data = []
@@ -29,7 +37,7 @@ def load_vae_data_from_disk(
 
                     total_data.append(
                         {
-                            'image': image.contiguous(),
+                            image_key: image.contiguous(),
                             'path': file_path,
                             'dataset_name': name,
                             'object_name': key
@@ -40,13 +48,18 @@ def load_vae_data_from_disk(
     dataloader = DataLoader(
         total_data,
         shuffle=shuffle,
-        batch_size=batch_size
+        batch_size=batch_size,
+        drop_last=drop_last,
+        pin_memory=pin_memory
     )
 
     return dataloader
 
 
-def load_multi_dataset(data_structure, saving_path=None):
+def load_multi_dataset(
+        data_structure,         
+        saving_path=None
+    ):
     """
     Load multiple dataset from a dict format
     :data_structure: Structure to load data
@@ -72,10 +85,23 @@ def load_multi_dataset(data_structure, saving_path=None):
         dataset_path = value['dataset_path']
         splits = value['splits']
         num_data = value['num_data']
+
+        if 'valid_name' in value:
+            valid_name = value['valid_name']
+        else:
+            valid_name = []
+
+        if 'invalid_name' in value:
+            invalid_name = value['invalid_name']
+        else:
+            invalid_name = []
+
         data = load_dataset(
             dataset_path, 
             splits,
-            num_data
+            valid_name=valid_name,
+            invalid_name=invalid_name,
+            num_data=num_data
         )
 
         datas[key] = data
@@ -90,6 +116,8 @@ def load_multi_dataset(data_structure, saving_path=None):
 def load_dataset(
         dataset_path: str, 
         splits: list=[],
+        valid_name: list=[],
+        invalid_name: list=[],
         num_data: int=0
     ):
     object_split_name = {}
@@ -119,6 +147,8 @@ def load_dataset(
         for split in valid_split:
             images, paths = load_images(
                 [os.path.join(dataset_path, object_name, split)],
+                valid_name=valid_name,
+                invalid_name=invalid_name,
                 num_data=num_data
             )
             data[object_name] = {
@@ -147,7 +177,7 @@ def load_images(
 
 
         # Get random number of image
-        if num_data:
+        if num_data and len(file_names) >= num_data:
             selected_images = random.sample(file_names, num_data)
         else:
             selected_images = file_names
@@ -185,9 +215,6 @@ def load_images(
                 else:
                     path_list.append(os.path.join(folder, file_name))
 
-            if (len(path_list) >= num_data) and num_data:
-                break
-
     for path in path_list:
 
         # Check file path
@@ -217,3 +244,46 @@ def load_images(
         images = torch.stack(images, 0)
 
     return images, path_list
+
+def plot_latent_space(vae=None, n=10, img_size=512, scale=0.5, figsize=5):
+    # display a n*n 2D manifold of images
+    figure = np.zeros((img_size * n, img_size * n, 3))
+    # linearly spaced coordinates corresponding to the 2D plot
+    # of images classes in the latent space
+    grid_x = np.linspace(-scale, scale, n)
+    grid_y = np.linspace(-scale, scale, n)[::-1]
+ 
+    for i, yi in enumerate(grid_y):
+        for j, xi in enumerate(grid_x):
+            sample = torch.tensor([[xi, yi]])
+            x_decoded = vae.decode(sample, verbose=0)['x_recon'].squeeze(0)            
+            images = x_decoded.permute(1, 2, 0).cpu().detach().numpy()
+
+            figure[
+                i * img_size : (i + 1) * img_size,
+                j * img_size : (j + 1) * img_size,
+            ] = images
+
+    plt.figure(figsize=(figsize, figsize))
+    start_range = img_size // 2
+    end_range = n * img_size + start_range
+    pixel_range = np.arange(start_range, end_range, img_size)
+    sample_range_x = np.round(grid_x, 1)
+    sample_range_y = np.round(grid_y, 1)
+    plt.xticks(pixel_range, sample_range_x)
+    plt.yticks(pixel_range, sample_range_y)
+    plt.xlabel("z[0]")
+    plt.ylabel("z[1]")
+    plt.imshow(figure, cmap="Greys_r")
+    plt.show()
+
+def day_time(timezone='Asia/Ho_Chi_Minh'):
+    now_utc = datetime.now(pytz.utc)
+
+    timezone = pytz.timezone(timezone)
+    now = now_utc.astimezone(timezone)
+
+    formatted_date = now.strftime("%d-%m-%Y")
+    formatted_time = now.strftime("%H-%M")
+
+    return formatted_date, formatted_time    
