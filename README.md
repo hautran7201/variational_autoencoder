@@ -3,6 +3,12 @@
 
 Decoding the latent space into images in the Nerf dataset.
 
+## Installation
+```bash
+  pip install -r requirements.txt
+```
+
+
 ## Running code
 Change directory
 ```bash

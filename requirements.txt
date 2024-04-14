@@ -1,0 +1,7 @@
+diffusers
+lpips
+composer
+mosaicml[wandb]
+hydra-core
+mosaicml-streaming
+accelerate

@@ -683,5 +683,3 @@ class ComposerDiffusersAutoEncoder(ComposerModel):
             metric.update(outputs['x_recon'], batch[self.input_key])
         else:
             metric.update(outputs['x_recon'], batch[self.input_key])
-
-
